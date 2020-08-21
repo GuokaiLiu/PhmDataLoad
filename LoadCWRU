@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on 2020/8/21
+
+@author: liuguokai
+
+Email: liuguokai@hust.edu.cn
+"""
+
+
+import scipy.io as sio
+import torch
+import numpy as np
+from torch.utils.data import Dataset, TensorDataset, DataLoader
+
+def Norm(a):
+    b = np.max(a,axis=0)
+    c = np.min(a,axis=0)
+    d = (a-c)/(b-c)
+    return d
+
+def loadcwru(domain,shape = '1D', norm = True, tensor = False, onehot=False):
+    data = sio.loadmat('CWRUAll/DataPre_CWRU_Demo.mat')
+    # Fetch X
+    X = data['dataset_X'][domain][0][0]
+    X = X.reshape(X.shape[0],1,32,32) if shape =='2D' else  X.reshape(X.shape[0],1024)
+    X = Norm(X) if norm == True else X
+    
+    # Fetch Y
+    Y = data['dataset_Y'][domain][0][0].reshape(-1,1)
+    Y = np.eye(10)[[i[0] for i in Y]] if onehot==True else Y
+
+    # Torch tensor transfer
+    X = torch.from_numpy(X).float()  if tensor==True else X
+    Y = torch.from_numpy(Y).long()  if tensor==True else Y
+    print('Domain %s: Training shape - %s, Testing shape - %s.'%(domain,X.shape,Y.shape))
+    return X, Y
+
+# Settings
+insize = '1D' # '1D' or 2D'
+source = 'D'  # 'A','B','C','D' 
+target = 'A'  # 'A','B','C','D'
+tensor = True # True, False
+
+# Load data
+X_train, Y_train = loadcwru(source, shape=insize, norm = True, tensor=tensor, onehot=True)
+X_test, Y_test = loadcwru(target, shape= insize, norm = True, tensor=tensor,onehot=True)
+
+if tensor==True:
+    # Prepare TensorDataset
+    Train_dataset = TensorDataset(X_train,Y_train)
+    Test_dataset = TensorDataset(X_test, Y_test)
+
+    # Prepare DataLoader
+    train_loader = DataLoader(Train_dataset,batch_size=100,shuffle=True) 
+    test_loader =DataLoader(Test_dataset,batch_size=1000,shuffle=False)
+
+    # Training 
+    for data, target in train_loader:
+        print(data.shape, target.shape)
+
+    # Testing 
+    for data, target in test_loader:
+        print(data.shape, target.shape)
+    print('All tensor DataLoaders prepared.')
+else:
+    print('All numpy datasets prepared.')
